@@ -1,0 +1,40 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of go coverage
+*.out
+
+# Dependency directories
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local configuration
+.env
+*.local
+
+# Tailscale state (for local testing)
+/state/
+
+# Kubernetes secrets (copy from .example and fill in)
+deploy/secret.yaml
+
+# Local kubeconfig
+.kube/

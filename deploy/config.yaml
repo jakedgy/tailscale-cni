@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tailscale-cni-config
+  namespace: kube-system
+data:
+  # Name of the Kubernetes cluster (used in Tailscale hostnames)
+  # Pods will appear as: {cluster-name}-{namespace}-{pod-name}
+  cluster-name: "k3d"
+
+  # Comma-separated Tailscale tags to apply to pods
+  # These tags must be defined in your Tailscale ACL policy
+  tags: "tag:k8s-pod"

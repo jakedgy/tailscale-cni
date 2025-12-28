@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package tailscalecni;
+
+option go_package = "github.com/jakedgy/tailscale-cni/pkg/proto";
+
+// TailscaleCNI is the service that the daemon exposes to the CNI shim.
+service TailscaleCNI {
+  // Add is called when a new pod is created.
+  rpc Add(AddRequest) returns (AddResponse);
+
+  // Del is called when a pod is deleted.
+  rpc Del(DelRequest) returns (DelResponse);
+
+  // Check is called to verify the pod's network is healthy.
+  rpc Check(CheckRequest) returns (CheckResponse);
+}
+
+message AddRequest {
+  // container_id is the unique identifier for the container.
+  string container_id = 1;
+
+  // netns is the path to the network namespace (e.g., /proc/<pid>/ns/net).
+  string netns = 2;
+
+  // if_name is the name of the interface to create in the pod (e.g., "ts0").
+  string if_name = 3;
+
+  // pod_name is the name of the pod from CNI_ARGS.
+  string pod_name = 4;
+
+  // pod_namespace is the Kubernetes namespace of the pod.
+  string pod_namespace = 5;
+
+  // pod_uid is the unique identifier of the pod.
+  string pod_uid = 6;
+
+  // cluster_ip is the pod's cluster IP (from previous CNI, e.g., flannel).
+  string cluster_ip = 7;
+}
+
+message AddResponse {
+  // tailscale_ipv4 is the assigned Tailscale IPv4 address (e.g., "100.64.1.10").
+  string tailscale_ipv4 = 1;
+
+  // tailscale_ipv6 is the assigned Tailscale IPv6 address if available.
+  string tailscale_ipv6 = 2;
+
+  // tailscale_hostname is the hostname registered in the tailnet.
+  string tailscale_hostname = 3;
+}
+
+message DelRequest {
+  // container_id is the unique identifier for the container.
+  string container_id = 1;
+
+  // netns is the path to the network namespace.
+  string netns = 2;
+
+  // if_name is the name of the interface to remove.
+  string if_name = 3;
+}
+
+message DelResponse {
+  // Empty response, success indicated by lack of error.
+}
+
+message CheckRequest {
+  // container_id is the unique identifier for the container.
+  string container_id = 1;
+
+  // netns is the path to the network namespace.
+  string netns = 2;
+
+  // if_name is the name of the interface to check.
+  string if_name = 3;
+}
+
+message CheckResponse {
+  // healthy indicates whether the pod's Tailscale connection is healthy.
+  bool healthy = 1;
+
+  // message provides additional details about the health status.
+  string message = 2;
+}
