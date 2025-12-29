@@ -107,12 +107,16 @@ spec:
             - -c
             - |
               set -e
-              # Use AUTH_KEY_TTL from env if set, otherwise default to 5m
-              TTL="${AUTH_KEY_TTL:-5m}"
-              exec /tailscale-cni-daemon \
-                --socket=/var/run/tailscale-cni/daemon.sock \
-                --state-dir=/var/lib/tailscale-cni \
-                --auth-key-ttl="$TTL"
+              if [ -n "$AUTH_KEY_TTL" ]; then
+                exec /tailscale-cni-daemon \
+                  --socket=/var/run/tailscale-cni/daemon.sock \
+                  --state-dir=/var/lib/tailscale-cni \
+                  --auth-key-ttl="$AUTH_KEY_TTL"
+              else
+                exec /tailscale-cni-daemon \
+                  --socket=/var/run/tailscale-cni/daemon.sock \
+                  --state-dir=/var/lib/tailscale-cni
+              fi
           env:
             - name: NODE_NAME
               valueFrom:
