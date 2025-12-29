@@ -90,6 +90,34 @@ func NewPodManager(stateDir, clusterName string, oauthMgr *OAuthManager) *PodMan
 	}
 }
 
+// stripKubernetesSuffixes removes common Kubernetes-generated suffixes from pod names.
+// Examples:
+//   - "nginx-deployment-7b5d9c6f8-xyz12" -> "nginx-deployment"
+//   - "plex-statefulset-0" -> "plex-statefulset-0" (StatefulSet ordinals are kept)
+//   - "redis-master-abc123" -> "redis-master" (simple random suffixes)
+func stripKubernetesSuffixes(podName string) string {
+	// Pattern for ReplicaSet: {name}-{hash}-{random}
+	// The hash is 8-10 alphanumeric characters, followed by a dash and 5 random characters
+	replicaSetPattern := regexp.MustCompile(`^(.+)-[a-z0-9]{8,10}-[a-z0-9]{5}$`)
+	if matches := replicaSetPattern.FindStringSubmatch(podName); len(matches) > 1 {
+		return matches[1]
+	}
+	
+	// Pattern for Deployment/ReplicaSet without random suffix: {name}-{hash}
+	// Only strip if hash looks like a ReplicaSet hash (8-10 alphanumeric)
+	deploymentPattern := regexp.MustCompile(`^(.+)-[a-z0-9]{8,10}$`)
+	if matches := deploymentPattern.FindStringSubmatch(podName); len(matches) > 1 {
+		baseName := matches[1]
+		// Don't strip if it looks like a StatefulSet ordinal
+		if !regexp.MustCompile(`-\d+$`).MatchString(baseName) {
+			return baseName
+		}
+	}
+	
+	// If no pattern matches, return the original name
+	return podName
+}
+
 // sanitizeHostname converts a string to a valid Tailscale hostname.
 func sanitizeHostname(s string) string {
 	s = strings.ToLower(s)
@@ -128,8 +156,10 @@ func (pm *PodManager) AddPod(ctx context.Context, containerID, netnsPath, ifName
 		return srv, nil
 	}
 
-	hostname := sanitizeHostname(fmt.Sprintf("%s-%s-%s", pm.clusterName, namespace, podName))
-	log.Printf("Creating Tailscale node for pod %s/%s with hostname %s", namespace, podName, hostname)
+	// Strip Kubernetes-generated suffixes for cleaner hostnames
+	cleanPodName := stripKubernetesSuffixes(podName)
+	hostname := sanitizeHostname(fmt.Sprintf("%s-%s-%s", pm.clusterName, namespace, cleanPodName))
+	log.Printf("Creating Tailscale node for pod %s/%s with hostname %s (stripped from %s)", namespace, podName, hostname, podName)
 
 	// Get auth key
 	authKey, err := pm.oauthMgr.CreateAuthKey(ctx, podName, namespace)
