@@ -108,6 +108,58 @@ Add to your Tailscale ACL policy:
 | `TS_TAGS` | Comma-separated Tailscale tags | `tag:k8s-pod` |
 | `AUTH_KEY_TTL` | TTL for auth keys (e.g., `5m`, `10m`) | `5m` |
 
+## Pod Annotations
+
+Control Tailscale behavior per-pod using annotations:
+
+| Annotation | Description | Default | Example |
+|------------|-------------|---------|---------|
+| `tailscale.com/enabled` | Enable/disable Tailscale for this pod | `"true"` | `"false"` |
+| `tailscale.com/tags` | Custom Tailscale tags (comma-separated) | Daemon-level tags | `"tag:media,tag:plex"` |
+| `tailscale.com/hostname` | Custom hostname override | `{cluster}-{namespace}-{pod}` | `"plex"` |
+| `tailscale.com/ephemeral` | Use ephemeral node (deleted on pod delete) | `"false"` | `"true"` |
+
+**Note on ephemeral nodes**: When `tailscale.com/ephemeral: "true"`, the pod will lose connectivity if the CNI daemon restarts. The pod will need to be restarted to reconnect. Useful for debug pods or truly ephemeral workloads.
+
+### Examples
+
+**Opt out of Tailscale** (useful for system pods like CSI drivers):
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-csi-driver
+  annotations:
+    tailscale.com/enabled: "false"
+spec:
+  # ...
+```
+
+**Custom hostname and tags** (e.g., for a Plex server):
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: plex
+  annotations:
+    tailscale.com/hostname: "plex"
+    tailscale.com/tags: "tag:media,tag:plex"
+spec:
+  # ...
+```
+
+**Ephemeral debug pod**:
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-pod
+  annotations:
+    tailscale.com/ephemeral: "true"
+spec:
+  # ...
+```
+
 ## How It Works
 
 1. kubelet invokes CNI plugin

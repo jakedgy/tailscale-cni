@@ -37,6 +37,9 @@ message AddRequest {
 
   // cluster_ip is the pod's cluster IP (from previous CNI, e.g., flannel).
   string cluster_ip = 7;
+
+  // pod_annotations is a map of pod annotations (key-value pairs).
+  map<string, string> pod_annotations = 8;
 }
 
 message AddResponse {

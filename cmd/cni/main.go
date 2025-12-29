@@ -128,6 +128,17 @@ func cmdAdd(args *skel.CmdArgs) error {
 		}
 	}
 
+	// Fetch pod annotations from Kubernetes API
+	podAnnotations, err := getPodAnnotations(
+		string(k8sArgs.K8S_POD_NAMESPACE),
+		string(k8sArgs.K8S_POD_NAME),
+	)
+	if err != nil {
+		// Log warning but continue - daemon will use defaults
+		fmt.Fprintf(os.Stderr, "Warning: failed to get pod annotations: %v\n", err)
+		podAnnotations = make(map[string]string)
+	}
+
 	client, conn, err := connectToDaemon(conf.DaemonSocket)
 	if err != nil {
 		return err
@@ -138,13 +149,14 @@ func cmdAdd(args *skel.CmdArgs) error {
 	defer cancel()
 
 	req := &pb.AddRequest{
-		ContainerId:  args.ContainerID,
-		Netns:        args.Netns,
-		IfName:       args.IfName,
-		PodName:      string(k8sArgs.K8S_POD_NAME),
-		PodNamespace: string(k8sArgs.K8S_POD_NAMESPACE),
-		PodUid:       string(k8sArgs.K8S_POD_UID),
-		ClusterIp:    clusterIP,
+		ContainerId:    args.ContainerID,
+		Netns:          args.Netns,
+		IfName:         args.IfName,
+		PodName:        string(k8sArgs.K8S_POD_NAME),
+		PodNamespace:   string(k8sArgs.K8S_POD_NAMESPACE),
+		PodUid:         string(k8sArgs.K8S_POD_UID),
+		ClusterIp:      clusterIP,
+		PodAnnotations: podAnnotations,
 	}
 
 	resp, err := client.Add(ctx, req)

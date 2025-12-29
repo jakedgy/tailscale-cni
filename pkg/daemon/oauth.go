@@ -137,9 +137,11 @@ func (m *OAuthManager) getAccessToken(ctx context.Context) (string, error) {
 	return m.accessToken, nil
 }
 
-// CreateAuthKey creates a new ephemeral, preauthorized auth key for a pod.
+// CreateAuthKey creates a new preauthorized auth key for a pod.
 // Rate-limited to prevent overwhelming the Tailscale API during burst pod creation.
-func (m *OAuthManager) CreateAuthKey(ctx context.Context, podName, namespace string) (string, error) {
+// ephemeral controls whether the node will be automatically deleted when it goes offline.
+// tags specifies the Tailscale tags to apply to the node.
+func (m *OAuthManager) CreateAuthKey(ctx context.Context, podName, namespace string, ephemeral bool, tags []string) (string, error) {
 	// Acquire semaphore slot (limits concurrent requests)
 	select {
 	case m.authKeySem <- struct{}{}:
@@ -175,9 +177,9 @@ func (m *OAuthManager) CreateAuthKey(ctx context.Context, podName, namespace str
 			Devices: authKeyDevices{
 				Create: authKeyCreate{
 					Reusable:      false,
-					Ephemeral:     false, // Non-ephemeral for recovery support
+					Ephemeral:     ephemeral,
 					Preauthorized: true,
-					Tags:          m.tags,
+					Tags:          tags,
 				},
 			},
 		},
