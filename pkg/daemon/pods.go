@@ -35,6 +35,24 @@ import (
 	"tailscale.com/wgengine/netstack"
 )
 
+var (
+	// Regex patterns for Kubernetes pod name suffix stripping
+	// Pattern for ReplicaSet: {name}-{hash}-{random}
+	// The hash is 8-10 alphanumeric characters, followed by a dash and 5 random characters
+	replicaSetPattern = regexp.MustCompile(`^(.+)-[a-z0-9]{8,10}-[a-z0-9]{5}$`)
+	
+	// Pattern for Deployment/ReplicaSet without random suffix: {name}-{hash}
+	// Only strip if hash looks like a ReplicaSet hash (8-10 alphanumeric)
+	deploymentPattern = regexp.MustCompile(`^(.+)-[a-z0-9]{8,10}$`)
+	
+	// Pattern to detect StatefulSet ordinals (e.g., -0, -1, -2)
+	statefulSetOrdinalPattern = regexp.MustCompile(`-\d+$`)
+	
+	// Patterns for hostname sanitization
+	hostnameInvalidCharsPattern = regexp.MustCompile(`[^a-z0-9-]`)
+	hostnameMultipleDashPattern = regexp.MustCompile(`-+`)
+)
+
 // WireGuard overhead is 60 bytes (IPv4) or 80 bytes (IPv6) for outer headers.
 // Default veth MTU allows for standard 1500-byte ethernet minus WireGuard overhead.
 const defaultVethMTU = 1420
@@ -93,23 +111,19 @@ func NewPodManager(stateDir, clusterName string, oauthMgr *OAuthManager) *PodMan
 // stripKubernetesSuffixes removes common Kubernetes-generated suffixes from pod names.
 // Examples:
 //   - "nginx-deployment-7b5d9c6f8-xyz12" -> "nginx-deployment"
+//   - "plex-7b5d9c6f8-abcde" -> "plex"
 //   - "plex-statefulset-0" -> "plex-statefulset-0" (StatefulSet ordinals are kept)
-//   - "redis-master-abc123" -> "redis-master" (simple random suffixes)
 func stripKubernetesSuffixes(podName string) string {
 	// Pattern for ReplicaSet: {name}-{hash}-{random}
-	// The hash is 8-10 alphanumeric characters, followed by a dash and 5 random characters
-	replicaSetPattern := regexp.MustCompile(`^(.+)-[a-z0-9]{8,10}-[a-z0-9]{5}$`)
 	if matches := replicaSetPattern.FindStringSubmatch(podName); len(matches) > 1 {
 		return matches[1]
 	}
 	
 	// Pattern for Deployment/ReplicaSet without random suffix: {name}-{hash}
-	// Only strip if hash looks like a ReplicaSet hash (8-10 alphanumeric)
-	deploymentPattern := regexp.MustCompile(`^(.+)-[a-z0-9]{8,10}$`)
 	if matches := deploymentPattern.FindStringSubmatch(podName); len(matches) > 1 {
 		baseName := matches[1]
 		// Don't strip if it looks like a StatefulSet ordinal
-		if !regexp.MustCompile(`-\d+$`).MatchString(baseName) {
+		if !statefulSetOrdinalPattern.MatchString(baseName) {
 			return baseName
 		}
 	}
@@ -121,10 +135,8 @@ func stripKubernetesSuffixes(podName string) string {
 // sanitizeHostname converts a string to a valid Tailscale hostname.
 func sanitizeHostname(s string) string {
 	s = strings.ToLower(s)
-	re := regexp.MustCompile(`[^a-z0-9-]`)
-	s = re.ReplaceAllString(s, "-")
-	re = regexp.MustCompile(`-+`)
-	s = re.ReplaceAllString(s, "-")
+	s = hostnameInvalidCharsPattern.ReplaceAllString(s, "-")
+	s = hostnameMultipleDashPattern.ReplaceAllString(s, "-")
 	s = strings.Trim(s, "-")
 	if len(s) > 63 {
 		s = s[:63]
