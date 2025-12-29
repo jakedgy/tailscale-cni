@@ -1,0 +1,113 @@
+# Examples of using Tailscale CNI pod annotations
+
+---
+# Example 1: Opt out of Tailscale (useful for CSI drivers, system pods, etc.)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: csi-driver
+  namespace: kube-system
+  annotations:
+    tailscale.com/enabled: "false"
+spec:
+  containers:
+  - name: csi-driver
+    image: k8s.gcr.io/sig-storage/csi-provisioner:latest
+
+---
+# Example 2: Custom hostname and tags for a Plex media server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: plex
+  namespace: media
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: plex
+  template:
+    metadata:
+      labels:
+        app: plex
+      annotations:
+        tailscale.com/hostname: "plex"
+        tailscale.com/tags: "tag:media,tag:plex"
+    spec:
+      containers:
+      - name: plex
+        image: plexinc/pms-docker:latest
+        ports:
+        - containerPort: 32400
+
+---
+# Example 3: Ephemeral debug pod (deleted from Tailnet when pod terminates)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-pod
+  namespace: default
+  annotations:
+    tailscale.com/ephemeral: "true"
+    tailscale.com/hostname: "debug"
+spec:
+  containers:
+  - name: debug
+    image: nicolaka/netshoot:latest
+    command: ["sleep", "infinity"]
+
+---
+# Example 4: Custom tags for a specific application tier
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+      annotations:
+        tailscale.com/tags: "tag:production,tag:api-gateway"
+    spec:
+      containers:
+      - name: api-gateway
+        image: myorg/api-gateway:v1.0.0
+
+---
+# Example 5: Combining multiple annotations
+apiVersion: v1
+kind: Pod
+metadata:
+  name: monitoring-agent
+  namespace: monitoring
+  annotations:
+    tailscale.com/hostname: "monitoring-agent"
+    tailscale.com/tags: "tag:monitoring,tag:agent"
+    tailscale.com/ephemeral: "false"  # Persist node after pod deletion
+spec:
+  containers:
+  - name: prometheus
+    image: prom/prometheus:latest
+
+---
+# Example 6: Default behavior (no annotations = uses daemon-level configuration)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: regular-app
+  namespace: default
+  # No Tailscale annotations - will use:
+  # - enabled: true (by default)
+  # - tags: from daemon-level TS_TAGS (e.g., "tag:k8s-pod")
+  # - hostname: k8s-default-regular-app (cluster-namespace-podname)
+  # - ephemeral: false (persistent node)
+spec:
+  containers:
+  - name: nginx
+    image: nginx:latest

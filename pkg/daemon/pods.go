@@ -119,7 +119,7 @@ func tunNameForContainer(containerID string) string {
 //   - TUN device created in HOST namespace for wgengine
 //   - veth pair bridges pod namespace to host
 //   - Kernel IP forwarding routes between TUN and veth
-func (pm *PodManager) AddPod(ctx context.Context, containerID, netnsPath, ifName, podName, namespace, clusterIP string) (*ManagedServer, error) {
+func (pm *PodManager) AddPod(ctx context.Context, containerID, netnsPath, ifName, podName, namespace, clusterIP string, podConfig *PodConfig) (*ManagedServer, error) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
@@ -128,15 +128,29 @@ func (pm *PodManager) AddPod(ctx context.Context, containerID, netnsPath, ifName
 		return srv, nil
 	}
 
-	hostname := sanitizeHostname(fmt.Sprintf("%s-%s-%s", pm.clusterName, namespace, podName))
+	// Determine hostname: use custom if provided, otherwise default format
+	var hostname string
+	if podConfig.Hostname != "" {
+		hostname = sanitizeHostname(podConfig.Hostname)
+	} else {
+		hostname = sanitizeHostname(fmt.Sprintf("%s-%s-%s", pm.clusterName, namespace, podName))
+	}
 	log.Printf("Creating Tailscale node for pod %s/%s with hostname %s", namespace, podName, hostname)
 
-	// Get auth key
-	authKey, err := pm.oauthMgr.CreateAuthKey(ctx, podName, namespace)
+	// Determine tags: use custom if provided, otherwise daemon-level tags
+	var tags []string
+	if len(podConfig.Tags) > 0 {
+		tags = podConfig.Tags
+	} else {
+		tags = pm.oauthMgr.tags
+	}
+
+	// Get auth key with ephemeral flag and custom tags
+	authKey, err := pm.oauthMgr.CreateAuthKey(ctx, podName, namespace, podConfig.Ephemeral, tags)
 	if err != nil {
 		return nil, fmt.Errorf("creating auth key: %w", err)
 	}
-	log.Printf("Got auth key for %s/%s", namespace, podName)
+	log.Printf("Got auth key for %s/%s (ephemeral=%v)", namespace, podName, podConfig.Ephemeral)
 
 	podStateDir := filepath.Join(pm.stateDir, "pods", containerID)
 	if err := os.MkdirAll(podStateDir, 0700); err != nil {

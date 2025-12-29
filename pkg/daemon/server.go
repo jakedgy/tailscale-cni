@@ -85,9 +85,23 @@ func (s *Server) Add(ctx context.Context, req *pb.AddRequest) (*pb.AddResponse, 
 	log.Printf("CNI ADD: container=%s pod=%s/%s netns=%s ifname=%s clusterIP=%s",
 		req.ContainerId, req.PodNamespace, req.PodName, req.Netns, req.IfName, req.ClusterIp)
 
+	// Parse pod annotations
+	podConfig := ParsePodAnnotations(req.PodAnnotations)
+
+	// If Tailscale is disabled for this pod, return early with no Tailscale IP
+	if !podConfig.Enabled {
+		log.Printf("CNI ADD: Tailscale disabled for pod %s/%s via annotation",
+			req.PodNamespace, req.PodName)
+		return &pb.AddResponse{
+			TailscaleIpv4:     "",
+			TailscaleIpv6:     "",
+			TailscaleHostname: "",
+		}, nil
+	}
+
 	// Use ts0 as the Tailscale interface name (eth0 is already used by primary CNI)
 	tsIfName := "ts0"
-	managed, err := s.podMgr.AddPod(ctx, req.ContainerId, req.Netns, tsIfName, req.PodName, req.PodNamespace, req.ClusterIp)
+	managed, err := s.podMgr.AddPod(ctx, req.ContainerId, req.Netns, tsIfName, req.PodName, req.PodNamespace, req.ClusterIp, podConfig)
 	if err != nil {
 		log.Printf("CNI ADD failed: %v", err)
 		return nil, fmt.Errorf("adding pod: %w", err)
