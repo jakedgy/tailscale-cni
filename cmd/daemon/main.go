@@ -64,7 +64,7 @@ func main() {
 	log.Printf("  State dir: %s", *stateDir)
 	log.Printf("  Cluster name: %s", cluster)
 	log.Printf("  Tags: %v", tags)
-	log.Printf("  Auth key TTL: %s", *authKeyTTL)
+	log.Printf("  Auth key TTL: [configured]")
 
 	// Create state directory
 	if err := os.MkdirAll(*stateDir, 0700); err != nil {
