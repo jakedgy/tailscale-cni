@@ -136,7 +136,7 @@ func (pm *PodManager) AddPod(ctx context.Context, containerID, netnsPath, ifName
 	if err != nil {
 		return nil, fmt.Errorf("creating auth key: %w", err)
 	}
-	log.Printf("Got auth key for %s/%s: %s...", namespace, podName, authKey[:min(len(authKey), 20)])
+	log.Printf("Got auth key for %s/%s", namespace, podName)
 
 	podStateDir := filepath.Join(pm.stateDir, "pods", containerID)
 	if err := os.MkdirAll(podStateDir, 0700); err != nil {
