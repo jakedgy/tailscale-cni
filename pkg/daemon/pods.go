@@ -45,8 +45,9 @@ var (
 	// Only strip if hash looks like a ReplicaSet hash (8-10 alphanumeric)
 	deploymentPattern = regexp.MustCompile(`^(.+)-[a-z0-9]{8,10}$`)
 	
-	// Pattern to detect StatefulSet ordinals (e.g., -0, -1, -2)
-	statefulSetOrdinalPattern = regexp.MustCompile(`-\d+$`)
+	// Pattern to detect StatefulSet ordinals (e.g., -0, -1, -2, up to -999)
+	// This checks if the pod name ends with a dash followed by 1-3 digits
+	statefulSetOrdinalPattern = regexp.MustCompile(`-\d{1,3}$`)
 	
 	// Patterns for hostname sanitization
 	hostnameInvalidCharsPattern = regexp.MustCompile(`[^a-z0-9-]`)
@@ -114,6 +115,12 @@ func NewPodManager(stateDir, clusterName string, oauthMgr *OAuthManager) *PodMan
 //   - "plex-7b5d9c6f8-abcde" -> "plex"
 //   - "plex-statefulset-0" -> "plex-statefulset-0" (StatefulSet ordinals are kept)
 func stripKubernetesSuffixes(podName string) string {
+	// Don't strip if it looks like a StatefulSet pod (ends with ordinal like -0, -1, -2, etc.)
+	// Check this first to avoid accidentally stripping StatefulSet ordinals
+	if statefulSetOrdinalPattern.MatchString(podName) {
+		return podName
+	}
+	
 	// Pattern for ReplicaSet: {name}-{hash}-{random}
 	if matches := replicaSetPattern.FindStringSubmatch(podName); len(matches) > 1 {
 		return matches[1]
@@ -121,11 +128,7 @@ func stripKubernetesSuffixes(podName string) string {
 	
 	// Pattern for Deployment/ReplicaSet without random suffix: {name}-{hash}
 	if matches := deploymentPattern.FindStringSubmatch(podName); len(matches) > 1 {
-		baseName := matches[1]
-		// Don't strip if it looks like a StatefulSet ordinal
-		if !statefulSetOrdinalPattern.MatchString(baseName) {
-			return baseName
-		}
+		return matches[1]
 	}
 	
 	// If no pattern matches, return the original name

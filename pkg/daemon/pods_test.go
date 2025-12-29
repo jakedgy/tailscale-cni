@@ -80,6 +80,21 @@ func TestStripKubernetesSuffixes(t *testing.T) {
 			input: "redis123-deployment-7b5d9c6f8-xyz12",
 			want:  "redis123-deployment",
 		},
+		{
+			name:  "hash ending with digits (not a StatefulSet ordinal)",
+			input: "app-12345678ab",
+			want:  "app",
+		},
+		{
+			name:  "hash that is all digits but 10 chars (not a StatefulSet ordinal)",
+			input: "web-1234567890",
+			want:  "web",
+		},
+		{
+			name:  "unusual edge case: statefulset name with ordinal, then hash",
+			input: "redis-statefulset-0-5f7d8c9b2a",
+			want:  "redis-statefulset-0", // Hash is stripped, ordinal in middle is kept
+		},
 	}
 
 	for _, tt := range tests {
