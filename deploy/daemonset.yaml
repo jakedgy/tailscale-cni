@@ -103,9 +103,16 @@ spec:
           image: tailscale-cni:latest
           imagePullPolicy: IfNotPresent
           command:
-            - /tailscale-cni-daemon
-            - --socket=/var/run/tailscale-cni/daemon.sock
-            - --state-dir=/var/lib/tailscale-cni
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              # Use AUTH_KEY_TTL from env if set, otherwise default to 5m
+              TTL="${AUTH_KEY_TTL:-5m}"
+              exec /tailscale-cni-daemon \
+                --socket=/var/run/tailscale-cni/daemon.sock \
+                --state-dir=/var/lib/tailscale-cni \
+                --auth-key-ttl="$TTL"
           env:
             - name: NODE_NAME
               valueFrom:
@@ -132,6 +139,12 @@ spec:
                 configMapKeyRef:
                   name: tailscale-cni-config
                   key: tags
+                  optional: true
+            - name: AUTH_KEY_TTL
+              valueFrom:
+                configMapKeyRef:
+                  name: tailscale-cni-config
+                  key: auth-key-ttl
                   optional: true
           securityContext:
             privileged: true

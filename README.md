@@ -106,6 +106,7 @@ Add to your Tailscale ACL policy:
 | `TS_OAUTH_CLIENT_SECRET` | Tailscale OAuth client secret | Required |
 | `CLUSTER_NAME` | Cluster name (used in hostnames) | `k8s` |
 | `TS_TAGS` | Comma-separated Tailscale tags | `tag:k8s-pod` |
+| `AUTH_KEY_TTL` | TTL for auth keys (e.g., `5m`, `10m`) | `5m` |
 
 ## How It Works
 
