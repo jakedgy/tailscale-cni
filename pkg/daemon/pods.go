@@ -38,11 +38,11 @@ import (
 var (
 	// Regex patterns for Kubernetes pod name suffix stripping
 	// Pattern for ReplicaSet: {name}-{hash}-{random}
-	// The hash is 8-10 alphanumeric characters, followed by a dash and 5 random characters
+	// The hash is 8-10 alphanumeric characters, followed by a dash and 5 alphanumeric characters
 	replicaSetPattern = regexp.MustCompile(`^(.+)-[a-z0-9]{8,10}-[a-z0-9]{5}$`)
 	
 	// Pattern for Deployment/ReplicaSet without random suffix: {name}-{hash}
-	// Only strip if hash looks like a ReplicaSet hash (8-10 alphanumeric)
+	// Only strip if hash looks like a ReplicaSet hash (8-10 alphanumeric characters)
 	deploymentPattern = regexp.MustCompile(`^(.+)-[a-z0-9]{8,10}$`)
 	
 	// Pattern to detect StatefulSet ordinals (e.g., -0, -1, -2, up to -999)
@@ -114,6 +114,9 @@ func NewPodManager(stateDir, clusterName string, oauthMgr *OAuthManager) *PodMan
 //   - "nginx-deployment-7b5d9c6f8-xyz12" -> "nginx-deployment"
 //   - "plex-7b5d9c6f8-abcde" -> "plex"
 //   - "plex-statefulset-0" -> "plex-statefulset-0" (StatefulSet ordinals are kept)
+//
+// Note: StatefulSet ordinals (-0, -1, -2) are checked first and preserved.
+// In real Kubernetes, StatefulSet pods are named "{name}-{ordinal}" without hashes.
 func stripKubernetesSuffixes(podName string) string {
 	// Don't strip if it looks like a StatefulSet pod (ends with ordinal like -0, -1, -2, etc.)
 	// Check this first to avoid accidentally stripping StatefulSet ordinals
