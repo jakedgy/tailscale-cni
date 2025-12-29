@@ -159,7 +159,11 @@ func (pm *PodManager) AddPod(ctx context.Context, containerID, netnsPath, ifName
 	// Strip Kubernetes-generated suffixes for cleaner hostnames
 	cleanPodName := stripKubernetesSuffixes(podName)
 	hostname := sanitizeHostname(fmt.Sprintf("%s-%s-%s", pm.clusterName, namespace, cleanPodName))
-	log.Printf("Creating Tailscale node for pod %s/%s with hostname %s (stripped from %s)", namespace, podName, hostname, podName)
+	if cleanPodName != podName {
+		log.Printf("Creating Tailscale node for pod %s/%s with hostname %s (cleaned: %s -> %s)", namespace, podName, hostname, podName, cleanPodName)
+	} else {
+		log.Printf("Creating Tailscale node for pod %s/%s with hostname %s", namespace, podName, hostname)
+	}
 
 	// Get auth key
 	authKey, err := pm.oauthMgr.CreateAuthKey(ctx, podName, namespace)
