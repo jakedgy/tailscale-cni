@@ -61,7 +61,7 @@ Pod → ts0 (veth) → kernel routing → TUN → wgengine → WireGuard → tai
 
 - Uses `ipnlocal.LocalBackend` directly instead of `tsnet.Server` for kernel TCP/IP via TUN (native performance, all IP protocols, standard debugging tools)
 - Pods use FileStore for state persistence, enabling daemon recovery
-- Hostname format: `{cluster-name}-{namespace}-{pod-name}` (sanitized to 63 chars)
+- Hostname format: `{cluster-name}-{namespace}-{pod-name}` (with Kubernetes suffixes automatically stripped, sanitized to 63 chars)
 
 ## Development Notes
 

@@ -35,6 +35,25 @@ import (
 	"tailscale.com/wgengine/netstack"
 )
 
+var (
+	// Regex patterns for Kubernetes pod name suffix stripping
+	// Pattern for ReplicaSet: {name}-{hash}-{random}
+	// The hash is 8-10 alphanumeric characters, followed by a dash and 5 alphanumeric characters
+	replicaSetPattern = regexp.MustCompile(`^(.+)-[a-z0-9]{8,10}-[a-z0-9]{5}$`)
+	
+	// Pattern for Deployment/ReplicaSet without random suffix: {name}-{hash}
+	// Only strip if hash looks like a ReplicaSet hash (8-10 alphanumeric characters)
+	deploymentPattern = regexp.MustCompile(`^(.+)-[a-z0-9]{8,10}$`)
+	
+	// Pattern to detect StatefulSet ordinals (e.g., -0, -1, -2, up to -999)
+	// This checks if the pod name ends with a dash followed by 1-3 digits
+	statefulSetOrdinalPattern = regexp.MustCompile(`-\d{1,3}$`)
+	
+	// Patterns for hostname sanitization
+	hostnameInvalidCharsPattern = regexp.MustCompile(`[^a-z0-9-]`)
+	hostnameMultipleDashPattern = regexp.MustCompile(`-+`)
+)
+
 // WireGuard overhead is 60 bytes (IPv4) or 80 bytes (IPv6) for outer headers.
 // Default veth MTU allows for standard 1500-byte ethernet minus WireGuard overhead.
 const defaultVethMTU = 1420
@@ -90,13 +109,40 @@ func NewPodManager(stateDir, clusterName string, oauthMgr *OAuthManager) *PodMan
 	}
 }
 
+// stripKubernetesSuffixes removes common Kubernetes-generated suffixes from pod names.
+// Examples:
+//   - "nginx-deployment-7b5d9c6f8-xyz12" -> "nginx-deployment"
+//   - "plex-7b5d9c6f8-abcde" -> "plex"
+//   - "plex-statefulset-0" -> "plex-statefulset-0" (StatefulSet ordinals are kept)
+//
+// Note: StatefulSet ordinals (-0, -1, -2) are checked first and preserved.
+// In real Kubernetes, StatefulSet pods are named "{name}-{ordinal}" without hashes.
+func stripKubernetesSuffixes(podName string) string {
+	// Don't strip if it looks like a StatefulSet pod (ends with ordinal like -0, -1, -2, etc.)
+	// Check this first to avoid accidentally stripping StatefulSet ordinals
+	if statefulSetOrdinalPattern.MatchString(podName) {
+		return podName
+	}
+	
+	// Pattern for ReplicaSet: {name}-{hash}-{random}
+	if matches := replicaSetPattern.FindStringSubmatch(podName); len(matches) > 1 {
+		return matches[1]
+	}
+	
+	// Pattern for Deployment/ReplicaSet without random suffix: {name}-{hash}
+	if matches := deploymentPattern.FindStringSubmatch(podName); len(matches) > 1 {
+		return matches[1]
+	}
+	
+	// If no pattern matches, return the original name
+	return podName
+}
+
 // sanitizeHostname converts a string to a valid Tailscale hostname.
 func sanitizeHostname(s string) string {
 	s = strings.ToLower(s)
-	re := regexp.MustCompile(`[^a-z0-9-]`)
-	s = re.ReplaceAllString(s, "-")
-	re = regexp.MustCompile(`-+`)
-	s = re.ReplaceAllString(s, "-")
+	s = hostnameInvalidCharsPattern.ReplaceAllString(s, "-")
+	s = hostnameMultipleDashPattern.ReplaceAllString(s, "-")
 	s = strings.Trim(s, "-")
 	if len(s) > 63 {
 		s = s[:63]
@@ -128,8 +174,14 @@ func (pm *PodManager) AddPod(ctx context.Context, containerID, netnsPath, ifName
 		return srv, nil
 	}
 
-	hostname := sanitizeHostname(fmt.Sprintf("%s-%s-%s", pm.clusterName, namespace, podName))
-	log.Printf("Creating Tailscale node for pod %s/%s with hostname %s", namespace, podName, hostname)
+	// Strip Kubernetes-generated suffixes for cleaner hostnames
+	cleanPodName := stripKubernetesSuffixes(podName)
+	hostname := sanitizeHostname(fmt.Sprintf("%s-%s-%s", pm.clusterName, namespace, cleanPodName))
+	if cleanPodName != podName {
+		log.Printf("Creating Tailscale node for pod %s/%s with hostname %s (cleaned: %s -> %s)", namespace, podName, hostname, podName, cleanPodName)
+	} else {
+		log.Printf("Creating Tailscale node for pod %s/%s with hostname %s", namespace, podName, hostname)
+	}
 
 	// Get auth key
 	authKey, err := pm.oauthMgr.CreateAuthKey(ctx, podName, namespace)

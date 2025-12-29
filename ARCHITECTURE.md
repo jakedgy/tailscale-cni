@@ -232,14 +232,22 @@ Pod hostnames on the tailnet follow the pattern:
 {cluster-name}-{namespace}-{pod-name}
 ```
 
+The `{pod-name}` component is automatically cleaned by stripping Kubernetes-generated suffixes:
+- ReplicaSet hashes and random suffixes (e.g., `-7b5d9c6f8-xyz12`) are removed
+- Deployment hashes (e.g., `-5f7d8c9b2a`) are removed
+- StatefulSet ordinals (e.g., `-0`, `-1`) are preserved
+
+Examples:
+- `nginx-deployment-7b5d9c6f8-xyz12` → `k3d-default-nginx-deployment`
+- `plex-7b5d9c6f8-xyz12` → `k3d-default-plex`
+- `redis-statefulset-0` → `k3d-default-redis-statefulset-0`
+
 Sanitization rules (`sanitizeHostname()`):
 - Lowercase
 - Replace non-alphanumeric with dashes
 - Collapse multiple dashes
 - Trim leading/trailing dashes
 - Truncate to 63 characters (DNS limit)
-
-Example: `k3d-default-nginx-deployment-7b5d9c6f8-xyz`
 
 ## Cleanup
 

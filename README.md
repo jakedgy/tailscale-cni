@@ -108,6 +108,15 @@ Add to your Tailscale ACL policy:
 | `TS_TAGS` | Comma-separated Tailscale tags | `tag:k8s-pod` |
 | `AUTH_KEY_TTL` | TTL for auth keys (e.g., `5m`, `10m`) | `5m` |
 
+## Hostname Generation
+
+Pods appear on your tailnet with hostnames in the format: `{cluster-name}-{namespace}-{pod-name}`
+
+The plugin automatically strips Kubernetes-generated suffixes to make hostnames cleaner:
+- `nginx-deployment-7b5d9c6f8-xyz12` → `k3d-default-nginx-deployment`
+- `plex-7b5d9c6f8-xyz12` → `k3d-default-plex`
+- StatefulSet ordinals are preserved: `redis-statefulset-0` → `k3d-default-redis-statefulset-0`
+
 ## How It Works
 
 1. kubelet invokes CNI plugin

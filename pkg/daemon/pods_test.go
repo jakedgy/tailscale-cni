@@ -4,6 +4,109 @@ package daemon
 
 import "testing"
 
+func TestStripKubernetesSuffixes(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "deployment with replicaset hash and random suffix",
+			input: "nginx-deployment-7b5d9c6f8-xyz12",
+			want:  "nginx-deployment",
+		},
+		{
+			name:  "deployment with full replicaset suffix",
+			input: "plex-deployment-7b5d9c6f8-abcde",
+			want:  "plex-deployment",
+		},
+		{
+			name:  "simple app name with replicaset suffix",
+			input: "plex-7b5d9c6f8-xyz12",
+			want:  "plex",
+		},
+		{
+			name:  "statefulset with ordinal (should not strip)",
+			input: "redis-statefulset-0",
+			want:  "redis-statefulset-0",
+		},
+		{
+			name:  "statefulset with higher ordinal",
+			input: "cassandra-3",
+			want:  "cassandra-3",
+		},
+		{
+			name:  "deployment with only hash (no random suffix)",
+			input: "api-server-5f7d8c9b2a",
+			want:  "api-server",
+		},
+		{
+			name:  "simple pod name without suffixes",
+			input: "my-pod",
+			want:  "my-pod",
+		},
+		{
+			name:  "pod with single dash",
+			input: "frontend-backend",
+			want:  "frontend-backend",
+		},
+		{
+			name:  "cronjob pod with timestamp",
+			input: "backup-job-1234567890-xyz12",
+			want:  "backup-job",
+		},
+		{
+			name:  "short hash that looks like replicaset",
+			input: "app-12345678-abcde",
+			want:  "app",
+		},
+		{
+			name:  "10 character hash",
+			input: "web-abcdef1234-xyz12",
+			want:  "web",
+		},
+		{
+			name:  "name with multiple dashes",
+			input: "my-very-long-app-name-7b5d9c6f8-xyz12",
+			want:  "my-very-long-app-name",
+		},
+		{
+			name:  "kubernetes system pod",
+			input: "coredns-7b5d9c6f8-xyz12",
+			want:  "coredns",
+		},
+		{
+			name:  "pod with numbers in name",
+			input: "redis123-deployment-7b5d9c6f8-xyz12",
+			want:  "redis123-deployment",
+		},
+		{
+			name:  "hash ending with digits (not a StatefulSet ordinal)",
+			input: "app-12345678ab",
+			want:  "app",
+		},
+		{
+			name:  "hash that is all digits but 10 chars (not a StatefulSet ordinal)",
+			input: "web-1234567890",
+			want:  "web",
+		},
+		{
+			name:  "unusual edge case: statefulset name with ordinal, then hash",
+			input: "redis-statefulset-0-5f7d8c9b2a",
+			want:  "redis-statefulset-0", // Hash is stripped, ordinal in middle is kept
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stripKubernetesSuffixes(tt.input)
+			if got != tt.want {
+				t.Errorf("stripKubernetesSuffixes(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSanitizeHostname(t *testing.T) {
 	tests := []struct {
 		name  string
