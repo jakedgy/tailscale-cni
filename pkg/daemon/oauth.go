@@ -29,6 +29,7 @@ type OAuthManager struct {
 	clientSecret string
 	baseURL      string
 	tags         []string
+	authKeyTTL   time.Duration // TTL for auth keys
 
 	mu          sync.Mutex
 	accessToken string
@@ -42,12 +43,17 @@ type OAuthManager struct {
 }
 
 // NewOAuthManager creates a new OAuth manager with the given credentials.
-func NewOAuthManager(clientID, clientSecret string, tags []string) *OAuthManager {
+// authKeyTTL specifies how long auth keys should be valid. If zero, defaults to 5 minutes.
+func NewOAuthManager(clientID, clientSecret string, tags []string, authKeyTTL time.Duration) *OAuthManager {
+	if authKeyTTL == 0 {
+		authKeyTTL = 5 * time.Minute // Default to 5 minutes
+	}
 	return &OAuthManager{
 		clientID:     clientID,
 		clientSecret: clientSecret,
 		baseURL:      "https://api.tailscale.com",
 		tags:         tags,
+		authKeyTTL:   authKeyTTL,
 		authKeySem:   make(chan struct{}, maxConcurrentAuthKeys),
 		httpClient:   &http.Client{Timeout: 30 * time.Second},
 	}
@@ -175,7 +181,7 @@ func (m *OAuthManager) CreateAuthKey(ctx context.Context, podName, namespace str
 				},
 			},
 		},
-		ExpirySeconds: 300, // 5 minutes, enough time for pod to start
+		ExpirySeconds: int(m.authKeyTTL.Seconds()),
 		Description:   fmt.Sprintf("tailscale-cni %s %s", namespace, podName),
 	}
 

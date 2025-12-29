@@ -11,3 +11,8 @@ data:
   # Comma-separated Tailscale tags to apply to pods
   # These tags must be defined in your Tailscale ACL policy
   tags: "tag:k8s-pod"
+
+  # TTL for auth keys (default: 5m)
+  # Increase this if your container registry is slow and image pulls take longer
+  # Examples: "5m", "10m", "15m"
+  # auth-key-ttl: "10m"

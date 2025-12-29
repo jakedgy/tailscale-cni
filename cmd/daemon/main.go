@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/jakedgy/tailscale-cni/pkg/daemon"
 )
@@ -20,6 +21,7 @@ func main() {
 	stateDir := flag.String("state-dir", "/var/lib/tailscale-cni", "Directory for state storage")
 	clusterName := flag.String("cluster-name", "", "Kubernetes cluster name (used in Tailscale hostnames)")
 	tagsFlag := flag.String("tags", "", "Comma-separated Tailscale tags for pods (e.g., tag:k8s-pod)")
+	authKeyTTL := flag.Duration("auth-key-ttl", 5*time.Minute, "TTL for auth keys (default 5m)")
 	flag.Parse()
 
 	// Get OAuth credentials from environment
@@ -62,6 +64,7 @@ func main() {
 	log.Printf("  State dir: %s", *stateDir)
 	log.Printf("  Cluster name: %s", cluster)
 	log.Printf("  Tags: %v", tags)
+	log.Printf("  Auth key TTL: [configured]")
 
 	// Create state directory
 	if err := os.MkdirAll(*stateDir, 0700); err != nil {
@@ -69,7 +72,7 @@ func main() {
 	}
 
 	// Initialize OAuth manager
-	oauthMgr := daemon.NewOAuthManager(clientID, clientSecret, tags)
+	oauthMgr := daemon.NewOAuthManager(clientID, clientSecret, tags, *authKeyTTL)
 
 	// Initialize pod manager
 	podMgr := daemon.NewPodManager(*stateDir, cluster, oauthMgr)
